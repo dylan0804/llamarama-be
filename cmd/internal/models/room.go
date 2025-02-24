@@ -9,21 +9,23 @@ import (
 
 type Client struct {
 	ID string
+	Email string
 	Conn *websocket.Conn
 }
 
 type MessagePayload struct {
 	Type string `json:"type"`
-	Content json.RawMessage `json:"content"`
+	Content string `json:"content"`
+	ClientID string `json:"client_id"`
 }
 
 type Message struct {
 	Sender *Client
-	Type string
-	Payload MessagePayload
+	Payload json.RawMessage
 }
 
 type Room struct {
+	ID string
 	Clients map[*Client]bool
 	Broadcast chan Message
 	Mutex *sync.Mutex

@@ -1,39 +1,29 @@
 package app
 
 import (
-	"time"
-
 	db "github.com/dylan0804/Llamarama/cmd/internal/db/sqlc"
 	"github.com/dylan0804/Llamarama/cmd/internal/handlers"
-	"github.com/dylan0804/Llamarama/cmd/internal/middleware"
-	"github.com/gin-contrib/cors"
+	"github.com/dylan0804/Llamarama/cmd/internal/utils"
 	"github.com/gin-gonic/gin"
 )
 
 type application struct {
 	router *gin.Engine
 	handler *handlers.Handler
+	sessionStore *utils.SessionStore
 }
 
 func New(queries *db.Queries) *application {
 	router := gin.Default()
 
-	router.Use(middleware.RequestLogger())
-	router.Use(gin.Recovery())
-	router.Use(cors.New(cors.Config{
-		AllowAllOrigins: true,
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
-	}))
+	sessionStore := utils.NewSessionStore()
 
-	handler := handlers.NewHandler(queries)
-
+	handler := handlers.NewHandler(queries, sessionStore)
+	
 	app := &application{
 		router: router,
 		handler: handler,
+		sessionStore: sessionStore,
 	}
 
 	return app

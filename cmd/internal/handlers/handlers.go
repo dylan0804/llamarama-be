@@ -9,8 +9,8 @@ import (
 	db "github.com/dylan0804/Llamarama/cmd/internal/db/sqlc"
 	"github.com/dylan0804/Llamarama/cmd/internal/models"
 	"github.com/dylan0804/Llamarama/cmd/internal/response"
+	"github.com/dylan0804/Llamarama/cmd/internal/services"
 	"github.com/dylan0804/Llamarama/cmd/internal/utils"
-	"github.com/dylan0804/Llamarama/cmd/internal/wsc"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -19,64 +19,48 @@ import (
 
 type Handler struct {
 	queries *db.Queries
+	sessionStore *utils.SessionStore
 }
 
-func NewHandler(queries *db.Queries) *Handler {
+func NewHandler(queries *db.Queries, sessionStore *utils.SessionStore) *Handler {
 	return &Handler{
 		queries: queries,
+		sessionStore: sessionStore,
 	}
 }
 
+var upgrade = websocket.Upgrader{
+	CheckOrigin: func (r *http.Request) bool {
+		return true
+	},
+}
+
 func (h *Handler) WsHandler(c *gin.Context) {	
-	conn, err := wsc.Upgrade.Upgrade(c.Writer, c.Request, nil)
+	conn, err := upgrade.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Println("Error upgrading to websocket:", err)
 		return
 	}
 	defer conn.Close()
 
+	userId := c.MustGet("user_id").(string)
+	
+	fmt.Println("userId", userId)
+
 	client := &models.Client{
-		ID: uuid.New().String(),
+		ID: userId,
 		Conn: conn,
 	}
 	
 	roomID := c.Param("id")
 
-	room := utils.GetRoom(roomID)
+	room := utils.GetRoom(roomID, h.queries)
 
-	room.Mutex.Lock()
-	room.Clients[client] = true
-	room.Mutex.Unlock()
+	room.ID = roomID
 
-	for {
-		_, message, err := conn.ReadMessage()
+	utils.AddClient(room, client)
 
-		if err != nil {
-			room.Mutex.Lock()
-			delete(room.Clients, client)
-			room.Mutex.Unlock()
-			break
-		}
-
-		var msg models.MessagePayload
-		if err := json.Unmarshal(message, &msg); err != nil {
-			log.Println("Error unmarshalling message:", err)
-			continue
-		}
-
-		switch msg.Type {
-		case "ping":
-			client.Conn.WriteMessage(websocket.TextMessage, []byte(`{"type": "pong"}`))
-		case "message":
-			room.Broadcast <- models.Message{
-				Sender: client,
-				Type: "message",
-				Payload: msg,
-			}
-		default:
-			fmt.Println("Received unknown message type:", msg.Type)
-		}
-	}
+	services.ReadMessages(room, client)
 }
 
 func (h *Handler) CreateRoom(c *gin.Context) {
@@ -133,4 +117,33 @@ func (h *Handler) GetRoom(c *gin.Context) {
 	}
 
 	response.Success(c.Writer, http.StatusOK, "Room fetched successfully", room)
+}
+
+func (h *Handler) Register(c *gin.Context) {
+	var userReq models.UserRequest
+
+	if err := c.ShouldBindJSON(&userReq); err != nil {
+		response.Error(c.Writer, http.StatusBadRequest, "Invalid request body", err.Error())
+		return
+	}
+
+	id, err := h.queries.CreateUser(c.Request.Context(), db.CreateUserParams{
+		Email: userReq.Email,
+		Password: userReq.Password,
+	})
+	if err != nil {
+		response.Error(c.Writer, http.StatusInternalServerError, "Failed to create user", err.Error())
+		return
+	}
+
+	token, err := h.sessionStore.CreateToken(c.Request.Context(), id.String())
+	if err != nil {
+		response.Error(c.Writer, http.StatusInternalServerError, "Failed to create token", err.Error())
+		return
+	}
+
+	response.Success(c.Writer, http.StatusCreated, "User created successfully", map[string]string{
+		"token": token,
+		"user_id": id.String(),
+	})
 }

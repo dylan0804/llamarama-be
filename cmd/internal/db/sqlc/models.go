@@ -8,6 +8,15 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Message struct {
+	ID        pgtype.UUID      `json:"id"`
+	UserID    pgtype.UUID      `json:"user_id"`
+	RoomID    pgtype.UUID      `json:"room_id"`
+	Content   string           `json:"content"`
+	CreatedAt pgtype.Timestamp `json:"created_at"`
+	UpdatedAt pgtype.Timestamp `json:"updated_at"`
+}
+
 type Room struct {
 	ID          pgtype.UUID      `json:"id"`
 	Name        string           `json:"name"`
@@ -15,4 +24,12 @@ type Room struct {
 	CreatedAt   pgtype.Timestamp `json:"created_at"`
 	UpdatedAt   pgtype.Timestamp `json:"updated_at"`
 	IsActive    bool             `json:"is_active"`
+}
+
+type User struct {
+	ID        pgtype.UUID      `json:"id"`
+	Email     string           `json:"email"`
+	Password  string           `json:"password"`
+	CreatedAt pgtype.Timestamp `json:"created_at"`
+	UpdatedAt pgtype.Timestamp `json:"updated_at"`
 }
