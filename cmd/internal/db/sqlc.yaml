@@ -9,3 +9,10 @@ sql:
         out: "sqlc"
         sql_package: "pgx/v5"
         emit_json_tags: true
+        json_tags_case_style: "camel"
+        # overrides:
+        #   - column: "messages.content"
+        #     go_type:
+        #       import: "github.com/dylan0804/Llamarama/cmd/internal/models"
+        #       package: "models"
+        #       type: "MessagePayload"

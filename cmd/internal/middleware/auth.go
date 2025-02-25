@@ -10,16 +10,22 @@ import (
 
 func AuthMiddleware(sessionStore *utils.SessionStore) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		token := c.GetHeader("Authorization")
+		var token string
+
+		authHeader := c.GetHeader("Authorization")
+
+		if authHeader != "" {
+			token = strings.TrimPrefix(authHeader, "Bearer ")
+		} else {
+			token = c.Query("token")
+		}
 
 		if token == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "No token provided"})
 			return
 		}
 
-		actualToken := strings.TrimPrefix(token, "Bearer ")
-
-		user, err := sessionStore.Get(c.Request.Context(), actualToken)
+		user, err := sessionStore.Get(c.Request.Context(), token)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			return

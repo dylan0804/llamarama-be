@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"log"
 	"net/http"
+	"strings"
+	"sync"
 
 	db "github.com/dylan0804/Llamarama/cmd/internal/db/sqlc"
 	"github.com/dylan0804/Llamarama/cmd/internal/models"
@@ -14,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -45,8 +48,6 @@ func (h *Handler) WsHandler(c *gin.Context) {
 
 	userId := c.MustGet("user_id").(string)
 	
-	fmt.Println("userId", userId)
-
 	client := &models.Client{
 		ID: userId,
 		Conn: conn,
@@ -110,13 +111,45 @@ func (h *Handler) GetRoom(c *gin.Context) {
 		return
 	}
 
-	room, err := h.queries.GetRoomById(c.Request.Context(), pgtype.UUID{Bytes: id, Valid: true})
-	if err != nil {
-		response.Error(c.Writer, http.StatusInternalServerError, "Error getting room by ID", err.Error())
+	var room db.GetRoomByIDRow
+	var messages []db.GetMessagesByRoomIdRow
+	var roomErr, msgError error
+
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		room, roomErr = h.queries.GetRoomByID(c.Request.Context(), pgtype.UUID{
+			Bytes: id,
+			Valid: true,
+		})
+	}()
+
+	go func() {
+		defer wg.Done()
+		messages, msgError = h.queries.GetMessagesByRoomId(c.Request.Context(), pgtype.UUID{
+			Bytes: id,
+			Valid: true,
+		})
+	}()
+
+	wg.Wait()
+
+	if roomErr != nil {
+		response.Error(c.Writer, http.StatusInternalServerError, "Error getting room by ID", roomErr.Error())
+		return
+	}
+	if msgError != nil {
+		response.Error(c.Writer, http.StatusInternalServerError, "Error getting messages by room ID", msgError.Error())
 		return
 	}
 
-	response.Success(c.Writer, http.StatusOK, "Room fetched successfully", room)
+	response.Success(c.Writer, http.StatusOK, "Room fetched successfully", gin.H{
+		"roomDetails": room,
+		"messages": messages,
+	})
 }
 
 func (h *Handler) Register(c *gin.Context) {
@@ -132,9 +165,17 @@ func (h *Handler) Register(c *gin.Context) {
 		Password: userReq.Password,
 	})
 	if err != nil {
+        var pgErr *pgconn.PgError
+        if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+            if strings.Contains(pgErr.ConstraintName, "email") {
+                response.Error(c.Writer, http.StatusConflict, "Email already exists", "A user with this email already exists")
+                return
+            }
+        }
+
 		response.Error(c.Writer, http.StatusInternalServerError, "Failed to create user", err.Error())
-		return
-	}
+        return
+    }
 
 	token, err := h.sessionStore.CreateToken(c.Request.Context(), id.String())
 	if err != nil {
@@ -142,7 +183,7 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 
-	response.Success(c.Writer, http.StatusCreated, "User created successfully", map[string]string{
+	response.Success(c.Writer, http.StatusCreated, "User created successfully", gin.H{
 		"token": token,
 		"user_id": id.String(),
 	})

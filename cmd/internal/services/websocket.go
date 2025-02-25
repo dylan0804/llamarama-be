@@ -27,13 +27,15 @@ func ReadMessages(room *models.Room, client *models.Client) {
 			continue
 		}
 
+		msg.UserID = client.ID
+
 		switch msg.Type {
 		case "ping":
 			client.Conn.WriteMessage(websocket.TextMessage, []byte(`{"type": "pong"}`))
 		case "message":
 			room.Broadcast <- models.Message{
 				Sender: client,
-				Payload: message,
+				Payload: msg,
 			}
 		default:
 			fmt.Println("Received unknown message type:", msg.Type)
@@ -45,14 +47,21 @@ func HandleMessages(room *models.Room, queries *db.Queries) {
 	for {
 		message := <- room.Broadcast
 
+		payload, err := json.Marshal(message.Payload)
+		if err != nil {
+			log.Println("Error marshalling message:", err)
+			continue
+		}
+
 		room.Mutex.Lock()
 		for client := range room.Clients {
 			fmt.Println("Sending message to client", message)
-			err := client.Conn.WriteMessage(websocket.TextMessage, message.Payload)
+	
+			err = client.Conn.WriteMessage(websocket.TextMessage, payload)
 			if err != nil {
 				client.Conn.Close()
 				delete(room.Clients, client)
-			}			
+			}
 		}
 
 		roomID, err := uuid.Parse(room.ID)
@@ -67,7 +76,9 @@ func HandleMessages(room *models.Room, queries *db.Queries) {
 			continue
 		}
 
-		queries.CreateMessage(context.Background(), db.CreateMessageParams{
+		fmt.Println(userID, roomID, message.Payload.Content)
+
+		err = queries.CreateMessage(context.Background(), db.CreateMessageParams{
 			UserID: pgtype.UUID{
 				Bytes: userID,
 				Valid: true,
@@ -76,8 +87,13 @@ func HandleMessages(room *models.Room, queries *db.Queries) {
 				Bytes: roomID,
 				Valid: true,
 			},
-			Content: string(message.Payload),
+			Content: message.Payload.Content,
 		})
+		if err != nil {
+			log.Println("Error inserting message:", err)
+			log.Printf("Message content being inserted: %s", string(payload))
+			continue
+		}
 
 		room.Mutex.Unlock()
 	}

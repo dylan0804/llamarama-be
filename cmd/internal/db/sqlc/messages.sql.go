@@ -17,8 +17,8 @@ VALUES ($1, $2, $3)
 `
 
 type CreateMessageParams struct {
-	UserID  pgtype.UUID `json:"user_id"`
-	RoomID  pgtype.UUID `json:"room_id"`
+	UserID  pgtype.UUID `json:"userId"`
+	RoomID  pgtype.UUID `json:"roomId"`
 	Content string      `json:"content"`
 }
 
@@ -28,25 +28,30 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) er
 }
 
 const getMessagesByRoomId = `-- name: GetMessagesByRoomId :many
-SELECT id, user_id, room_id, content, created_at, updated_at FROM messages WHERE room_id = $1
+SELECT user_id, room_id, content, created_at FROM messages WHERE room_id = $1
 `
 
-func (q *Queries) GetMessagesByRoomId(ctx context.Context, roomID pgtype.UUID) ([]Message, error) {
+type GetMessagesByRoomIdRow struct {
+	UserID    pgtype.UUID      `json:"userId"`
+	RoomID    pgtype.UUID      `json:"roomId"`
+	Content   string           `json:"content"`
+	CreatedAt pgtype.Timestamp `json:"createdAt"`
+}
+
+func (q *Queries) GetMessagesByRoomId(ctx context.Context, roomID pgtype.UUID) ([]GetMessagesByRoomIdRow, error) {
 	rows, err := q.db.Query(ctx, getMessagesByRoomId, roomID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Message
+	var items []GetMessagesByRoomIdRow
 	for rows.Next() {
-		var i Message
+		var i GetMessagesByRoomIdRow
 		if err := rows.Scan(
-			&i.ID,
 			&i.UserID,
 			&i.RoomID,
 			&i.Content,
 			&i.CreatedAt,
-			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

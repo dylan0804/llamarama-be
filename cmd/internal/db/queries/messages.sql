@@ -3,4 +3,4 @@ INSERT INTO messages (user_id, room_id, content)
 VALUES ($1, $2, $3);
 
 -- name: GetMessagesByRoomId :many
-SELECT * FROM messages WHERE room_id = $1;
+SELECT user_id, room_id, content, created_at FROM messages WHERE room_id = $1;

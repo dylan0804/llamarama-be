@@ -10,26 +10,26 @@ import (
 
 type Message struct {
 	ID        pgtype.UUID      `json:"id"`
-	UserID    pgtype.UUID      `json:"user_id"`
-	RoomID    pgtype.UUID      `json:"room_id"`
+	UserID    pgtype.UUID      `json:"userId"`
+	RoomID    pgtype.UUID      `json:"roomId"`
 	Content   string           `json:"content"`
-	CreatedAt pgtype.Timestamp `json:"created_at"`
-	UpdatedAt pgtype.Timestamp `json:"updated_at"`
+	CreatedAt pgtype.Timestamp `json:"createdAt"`
+	UpdatedAt pgtype.Timestamp `json:"updatedAt"`
 }
 
 type Room struct {
 	ID          pgtype.UUID      `json:"id"`
 	Name        string           `json:"name"`
 	Description pgtype.Text      `json:"description"`
-	CreatedAt   pgtype.Timestamp `json:"created_at"`
-	UpdatedAt   pgtype.Timestamp `json:"updated_at"`
-	IsActive    bool             `json:"is_active"`
+	CreatedAt   pgtype.Timestamp `json:"createdAt"`
+	UpdatedAt   pgtype.Timestamp `json:"updatedAt"`
+	IsActive    bool             `json:"isActive"`
 }
 
 type User struct {
 	ID        pgtype.UUID      `json:"id"`
 	Email     string           `json:"email"`
 	Password  string           `json:"password"`
-	CreatedAt pgtype.Timestamp `json:"created_at"`
-	UpdatedAt pgtype.Timestamp `json:"updated_at"`
+	CreatedAt pgtype.Timestamp `json:"createdAt"`
+	UpdatedAt pgtype.Timestamp `json:"updatedAt"`
 }
