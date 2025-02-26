@@ -44,7 +44,7 @@ func (q *Queries) GetMessagesByRoomId(ctx context.Context, roomID pgtype.UUID) (
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetMessagesByRoomIdRow
+	items := []GetMessagesByRoomIdRow{}
 	for rows.Next() {
 		var i GetMessagesByRoomIdRow
 		if err := rows.Scan(

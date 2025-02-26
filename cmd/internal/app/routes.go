@@ -31,6 +31,10 @@ func (app *application) routes() error {
 		auth := v1.Group("/auth")
 		{
 			auth.POST("/register", app.handler.Register)
+			auth.POST("/login", app.handler.Login)
+
+			auth.Use(middleware.AuthMiddleware(app.sessionStore))
+			auth.POST("/logout", app.handler.Logout)
 		}
 
 		rooms := v1.Group("/rooms")

@@ -18,6 +18,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Handler struct {
@@ -159,15 +160,22 @@ func (h *Handler) Register(c *gin.Context) {
 		response.Error(c.Writer, http.StatusBadRequest, "Invalid request body", err.Error())
 		return
 	}
+	
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(userReq.Password), bcrypt.DefaultCost)
+	if err != nil {
+		response.Error(c.Writer, http.StatusInternalServerError, "Failed to hash password", err.Error())
+		return
+	}
 
 	id, err := h.queries.CreateUser(c.Request.Context(), db.CreateUserParams{
 		Email: userReq.Email,
-		Password: userReq.Password,
+		Password: string(hashedPassword),
 	})
 	if err != nil {
         var pgErr *pgconn.PgError
         if errors.As(err, &pgErr) && pgErr.Code == "23505" {
             if strings.Contains(pgErr.ConstraintName, "email") {
+				log.Println("error", pgErr.ConstraintName)
                 response.Error(c.Writer, http.StatusConflict, "Email already exists", "A user with this email already exists")
                 return
             }
@@ -187,4 +195,41 @@ func (h *Handler) Register(c *gin.Context) {
 		"token": token,
 		"user_id": id.String(),
 	})
+}
+
+func (h *Handler) Login(c *gin.Context) {
+	var userReq models.UserRequest
+
+	if err := c.ShouldBindJSON(&userReq); err != nil {
+		response.Error(c.Writer, http.StatusBadRequest, "Invalid request body", err.Error())
+		return
+	}
+
+	user, err := h.queries.GetUserByEmail(c.Request.Context(), userReq.Email)
+	if err != nil {
+		response.Error(c.Writer, http.StatusInternalServerError, "Invalid email or password", err.Error())
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(userReq.Password)); err != nil {
+		response.Error(c.Writer, http.StatusUnauthorized, "Invalid password", err.Error())
+		return
+	}
+
+	token, err := h.sessionStore.CreateToken(c.Request.Context(), user.ID.String())
+	if err != nil {
+		response.Error(c.Writer, http.StatusInternalServerError, "Failed to create token", err.Error())
+		return
+	}
+
+	response.Success(c.Writer, http.StatusOK, "Login successful", gin.H{
+		"token": token,
+		"user_id": user.ID.String(),
+	})
+}
+
+func (h *Handler) Logout(c *gin.Context) {
+	h.sessionStore.Delete(c.Request.Context(), c.MustGet("user_token").(string))
+
+	response.Success(c.Writer, http.StatusOK, "Logout successful", nil)
 }

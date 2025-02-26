@@ -32,6 +32,7 @@ func AuthMiddleware(sessionStore *utils.SessionStore) gin.HandlerFunc {
 		}
 
 		c.Set("user_id", user["user_id"])
+		c.Set("user_token", token)
 
 		c.Next()
 	}

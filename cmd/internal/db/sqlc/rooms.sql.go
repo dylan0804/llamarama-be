@@ -36,7 +36,7 @@ func (q *Queries) GetAllRooms(ctx context.Context) ([]Room, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Room
+	items := []Room{}
 	for rows.Next() {
 		var i Room
 		if err := rows.Scan(
@@ -74,7 +74,7 @@ func (q *Queries) GetMessagesByRoomID(ctx context.Context, roomID pgtype.UUID) (
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetMessagesByRoomIDRow
+	items := []GetMessagesByRoomIDRow{}
 	for rows.Next() {
 		var i GetMessagesByRoomIDRow
 		if err := rows.Scan(
