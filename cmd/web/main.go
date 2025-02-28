@@ -27,7 +27,6 @@ func main() {
 	config, err := pgxpool.ParseConfig(os.Getenv("DATABASE_URL"))
 	if err != nil {
 		log.Fatal("Unable to parse database URL:", err)
-		return
 	}
 	
 	config.ConnConfig.DefaultQueryExecMode = 5
@@ -35,7 +34,6 @@ func main() {
 	conn, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		log.Fatal("Unable to connect to database:", err)
-		return
 	}
 	defer conn.Close()
 
@@ -47,6 +45,5 @@ func main() {
 	
 	if err != nil {
 		log.Fatal("Error running application:", err)
-		return
 	}
 }
