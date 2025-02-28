@@ -76,8 +76,6 @@ func HandleMessages(room *models.Room, queries *db.Queries) {
 			continue
 		}
 
-		fmt.Println(userID, roomID, message.Payload.Content)
-
 		err = queries.CreateMessage(context.Background(), db.CreateMessageParams{
 			UserID: pgtype.UUID{
 				Bytes: userID,

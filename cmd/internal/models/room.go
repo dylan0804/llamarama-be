@@ -16,7 +16,8 @@ type Client struct {
 type MessagePayload struct {
 	Type string `json:"type"`
 	Content string `json:"content"`
-	UserID string `json:"user_id"`
+	UserID string `json:"userId"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 type Message struct {
